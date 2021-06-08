@@ -1,0 +1,3 @@
+metrics/debug.test
+cmd/nginxmetrics/nginxmetrics
+metrics/sample.json.log
