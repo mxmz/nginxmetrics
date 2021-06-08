@@ -38,7 +38,7 @@ func NewMetrics(c *Config) *Metrics {
 	backend_response_time := promauto.With(r).NewSummaryVec(prometheus.SummaryOpts{
 		Name:       "backend_response_time",
 		Help:       "Backend request time",
-		MaxAge:     30 * time.Second,
+		MaxAge:     10 * time.Minute,
 		Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 	}, []string{"vhost", "backend_status"})
 
