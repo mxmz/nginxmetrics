@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/hpcloud/tail"
@@ -8,6 +9,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -17,9 +19,27 @@ import (
 func main() {
 	var m = metrics.NewMetrics(nil)
 
-	for _, v := range os.Args[1:] {
-		go followLog(m, v)
-	}
+	go func() {
+		var found = map[string]struct{}{}
+		for {
+			fmt.Println(found)
+			for _, v := range os.Args[1:] {
+
+				var files, _ = filepath.Glob(v)
+				if files != nil {
+					for _, v := range files {
+						if _, ok := found[v]; !ok {
+							go followLog(m, v)
+							found[v] = struct{}{}
+						}
+					}
+
+				}
+			}
+			time.Sleep(10 * time.Second)
+		}
+
+	}()
 	http.Handle("/metrics", m.HttpHandler())
 	http.ListenAndServe(":2112", nil)
 }
