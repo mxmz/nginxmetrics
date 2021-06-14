@@ -21,4 +21,4 @@ build-go:
   artifacts:
     paths:
       - cmd/nginxmetrics/nginxmetrics
-      - - cmd/nginxmetrics/nginxconfig.json
+      - cmd/nginxmetrics/nginxconfig.json
