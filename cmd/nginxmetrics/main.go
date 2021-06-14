@@ -2,38 +2,45 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/hpcloud/tail"
 
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"mxmz.it/nginxmetrics/metrics"
 )
 
+type config struct {
+	Metrics map[string]*metrics.MetricConfig `json:"metrics,omitempty"`
+}
+
 func main() {
-	var m = metrics.NewMetrics(nil)
+	var config config
+	var configContent, err = ioutil.ReadFile(os.Args[1])
+	if err != nil {
+		panic(err)
+	}
+	json.Unmarshal(configContent, &config)
+
+	var m = metrics.NewMetrics(&metrics.Config{Metrics: config.Metrics})
 
 	go func() {
 		var found = map[string]struct{}{}
 		for {
 			fmt.Println(found)
-			for _, v := range os.Args[1:] {
+			for _, v := range os.Args[2:] {
 
 				var files, _ = filepath.Glob(v)
-				if files != nil {
-					for _, v := range files {
-						if _, ok := found[v]; !ok {
-							go followLog(m, v)
-							found[v] = struct{}{}
-						}
+				for _, v := range files {
+					if _, ok := found[v]; !ok {
+						go followLog(m, v)
+						found[v] = struct{}{}
 					}
-
 				}
 			}
 			time.Sleep(10 * time.Second)
@@ -41,27 +48,27 @@ func main() {
 
 	}()
 	http.Handle("/metrics", m.HttpHandler())
-	http.ListenAndServe(":2112", nil)
+	http.ListenAndServe(":9802", nil)
 }
 
-func readLog(m *metrics.Metrics) {
+// func readLog(m *metrics.Metrics) {
 
-	for {
-		var file, _ = ioutil.ReadFile("../../metrics/sample.json.log")
+// 	for {
+// 		var file, _ = ioutil.ReadFile("../../metrics/sample.json.log")
 
-		var lines = strings.Split(string(file), "\n")
+// 		var lines = strings.Split(string(file), "\n")
 
-		for _, line := range lines {
-			var lineMap map[string]string
-			json.Unmarshal([]byte(line), &lineMap)
-			m.HandleLogLine(lineMap)
-			if lineMap["vhost"] == "" {
-				panic("")
-			}
-			time.Sleep(10 * time.Millisecond)
-		}
-	}
-}
+// 		for _, line := range lines {
+// 			var lineMap map[string]string
+// 			json.Unmarshal([]byte(line), &lineMap)
+// 			m.HandleLogLine(lineMap)
+// 			if lineMap["vhost"] == "" {
+// 				panic("")
+// 			}
+// 			time.Sleep(10 * time.Millisecond)
+// 		}
+// 	}
+// }
 
 func followLog(m *metrics.Metrics, path string) {
 

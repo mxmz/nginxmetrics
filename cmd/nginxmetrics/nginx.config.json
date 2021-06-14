@@ -1,0 +1,28 @@
+{
+	"metrics": {
+		"bytes_sent": {
+			"value_source": "body_bytes_sent",
+			"type":        "counter",
+			"label_map": {
+				"vhost":  "vhost",
+				"method": "method"
+			}
+		},
+		"request_time": {
+			"value_source": "request_time",
+			"type":        "summary",
+			"label_map": {
+				"vhost":  "vhost",
+				"status": "status"
+			}
+		},
+		"backend_response_time": {
+			"value_source": "backend_response_time",
+			"type":        "summary",
+			"label_map": {
+				"vhost":          "vhost",
+				"backend_status": "backend_status"
+			}
+		}
+	}
+}
