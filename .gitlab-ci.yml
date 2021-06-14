@@ -2,7 +2,6 @@ stages:
   - test
   - build1
 
-
 #format:
 #  image: golang:latest
 #  stage: test
