@@ -31,7 +31,7 @@
 			}
 		},
 		"nginx_crit_count": {
-			"value_source": "error",
+			"value_source": "crit",
 			"type":        "counter",
 			"label_map": {
 			}
