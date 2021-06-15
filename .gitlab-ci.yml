@@ -1,0 +1,23 @@
+stages:
+  - test
+  - build1
+
+#format:
+#  image: golang:latest
+#  stage: test
+#  script:
+#    - cd $GOPATH/src/$REPO_NAME
+#    - go fmt $(go list ./... | grep -v /vendor/)
+#    - go vet $(go list ./... | grep -v /vendor/)
+#    - go test -race $(go list ./... | grep -v /vendor/)
+
+build-go:
+  image: golang:latest
+  stage: build1
+  script:
+    - cd cmd/nginxmetrics
+    - go build -x 
+  artifacts:
+    paths:
+      - cmd/nginxmetrics/nginxmetrics
+      - cmd/nginxmetrics/nginx.config.json
