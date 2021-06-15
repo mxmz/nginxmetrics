@@ -1,6 +1,6 @@
 {
 	"metrics": {
-		"bytes_sent": {
+		"nginx_body_bytes_sent": {
 			"value_source": "body_bytes_sent",
 			"type":        "counter",
 			"label_map": {
@@ -8,7 +8,7 @@
 				"method": "method"
 			}
 		},
-		"request_time": {
+		"nginx_request_time": {
 			"value_source": "request_time",
 			"type":        "summary",
 			"label_map": {
@@ -16,7 +16,7 @@
 				"status": "status"
 			}
 		},
-		"backend_response_time": {
+		"nginx_backend_response_time": {
 			"value_source": "backend_response_time",
 			"type":        "summary",
 			"label_map": {
