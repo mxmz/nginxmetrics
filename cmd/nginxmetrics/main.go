@@ -105,9 +105,6 @@ func followLog(m *metrics.Metrics, path string) {
 
 				if err == nil {
 					m.HandleLogLine(lineMap)
-					if lineMap["vhost"] == "" {
-						panic("")
-					}
 					count++
 					//println(count, line.Text)
 				}
