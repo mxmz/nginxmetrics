@@ -1,9 +1,11 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/hpcloud/tail"
 
@@ -83,8 +85,24 @@ func followLog(m *metrics.Metrics, path string) {
 		select {
 		case line := <-lines:
 			{
+				var err error
 				var lineMap map[string]string
-				err := json.Unmarshal([]byte(line.Text), &lineMap)
+				if strings.HasPrefix(line.Text, "{") {
+					err = json.Unmarshal([]byte(line.Text), &lineMap)
+				} else {
+					if strings.Contains(line.Text, "[error]") {
+						lineMap = map[string]string{
+							"error": "1",
+						}
+					} else if strings.Contains(line.Text, "[crit]") {
+						lineMap = map[string]string{
+							"crit": "1",
+						}
+					} else {
+						err = errors.New("SKIPPING LINE")
+					}
+				}
+
 				if err == nil {
 					m.HandleLogLine(lineMap)
 					if lineMap["vhost"] == "" {

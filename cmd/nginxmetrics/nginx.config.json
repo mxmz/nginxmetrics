@@ -23,6 +23,18 @@
 				"vhost":          "vhost",
 				"backend_status": "backend_status"
 			}
+		},
+		"nginx_error_count": {
+			"value_source": "error",
+			"type":        "counter",
+			"label_map": {
+			}
+		},
+		"nginx_crit_count": {
+			"value_source": "error",
+			"type":        "counter",
+			"label_map": {
+			}
 		}
 	}
 }
