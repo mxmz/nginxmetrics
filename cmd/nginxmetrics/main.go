@@ -48,6 +48,7 @@ func main() {
 
 	}()
 	http.Handle("/metrics", m.HttpHandler())
+	http.Handle("/", m.HttpHandler())
 	http.ListenAndServe(":9802", nil)
 }
 
