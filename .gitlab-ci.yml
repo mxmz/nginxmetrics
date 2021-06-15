@@ -6,7 +6,6 @@ stages:
 #  image: golang:latest
 #  stage: test
 #  script:
-#    - cd $GOPATH/src/$REPO_NAME
 #    - go fmt $(go list ./... | grep -v /vendor/)
 #    - go vet $(go list ./... | grep -v /vendor/)
 #    - go test -race $(go list ./... | grep -v /vendor/)
