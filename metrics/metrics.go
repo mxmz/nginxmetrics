@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"net/http"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -14,6 +15,7 @@ type MetricConfig struct {
 	Type        string            `json:"type,omitempty"`
 	ValueSource string            `json:"value_source,omitempty"`
 	LabelMap    map[string]string `json:"label_map,omitempty"`
+	IfMatch     map[string]string `json:"if_match,omitempty"`
 }
 
 type Config struct {
@@ -35,22 +37,39 @@ func keys(m map[string]string) []string {
 	return l
 }
 
+func makeIfMatchMap(m map[string]string) map[string]*regexp.Regexp {
+	if m == nil {
+		return nil
+	}
+	var rv = map[string]*regexp.Regexp{}
+	for k, v := range m {
+		rv[k] = regexp.MustCompile(v)
+	}
+	return rv
+}
+
 func NewMetrics(c *Config) *Metrics {
 	var metrics = map[string]injectLineFunc{}
 	var r = prometheus.NewRegistry()
 
 	for k, v := range c.Metrics {
+		var name = k
+		var labelMap = v.LabelMap
+		var valueSource = v.ValueSource
+		var ifMatch = makeIfMatchMap(v.IfMatch)
 		switch v.Type {
 		case "counter":
 			{
-				var name = k
-				var labelMap = v.LabelMap
-				var valueSource = v.ValueSource
 				counter := promauto.With(r).NewCounterVec(prometheus.CounterOpts{
 					Name: name,
 					Help: name,
 				}, keys(v.LabelMap))
 				metrics[k] = func(l map[string]string) {
+					for k, v := range ifMatch {
+						if !v.MatchString(l[k]) {
+							return
+						}
+					}
 					c, err := strconv.ParseFloat(l[valueSource], 64)
 					if err == nil {
 						var labelValues = map[string]string{}
@@ -64,9 +83,6 @@ func NewMetrics(c *Config) *Metrics {
 			break
 		case "summary":
 			{
-				var name = k
-				var labelMap = v.LabelMap
-				var valueSource = v.ValueSource
 				counter := promauto.With(r).NewSummaryVec(prometheus.SummaryOpts{
 					Name:       name,
 					Help:       name,
@@ -74,6 +90,11 @@ func NewMetrics(c *Config) *Metrics {
 					Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 				}, keys(v.LabelMap))
 				metrics[k] = func(l map[string]string) {
+					for k, v := range ifMatch {
+						if !v.MatchString(l[k]) {
+							return
+						}
+					}
 					c, err := strconv.ParseFloat(l[valueSource], 64)
 					if err == nil {
 						var labelValues = map[string]string{}

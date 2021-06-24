@@ -34,6 +34,28 @@ var config1 = `
 				"vhost":          "vhost",
 				"backend_status": "backend_status"
 			}
+		},
+		"js_backend_response_time": {
+			"value_source": "backend_response_time",
+			"type":        "summary",
+			"label_map": {
+				"vhost":          "vhost",
+				"backend_status": "backend_status"
+			},
+			"if_match": {
+				"uri": "^/js/"
+			}
+		},
+		"lib_backend_response_time": {
+			"value_source": "backend_response_time",
+			"type":        "summary",
+			"label_map": {
+				"vhost":          "vhost",
+				"backend_status": "backend_status"
+			},
+			"if_match": {
+				"uri": "^/lib/"
+			}
 		}
 	}
 }`
@@ -58,6 +80,10 @@ func TestMetrics_HandleLogLine(t *testing.T) {
 
 	fmt.Printf("r: %v\n", r)
 
-	//var c = m.bytes_sent
+	var c, _ = r.Gather()
+	for _, v := range c {
+
+		fmt.Printf("v: %v\n", v)
+	}
 	var _ = r
 }

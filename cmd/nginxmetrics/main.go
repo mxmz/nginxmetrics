@@ -34,7 +34,7 @@ func main() {
 	go func() {
 		var found = map[string]struct{}{}
 		for {
-			fmt.Println(found)
+			fmt.Println(len(found))
 			for _, v := range os.Args[2:] {
 
 				var files, _ = filepath.Glob(v)
