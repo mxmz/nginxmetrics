@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -28,8 +29,7 @@ func NewUniqueCounter(size int, maxAge time.Duration) *UniqueCounter {
 	return &UniqueCounter{c, maxAge}
 }
 
-func (uc *UniqueCounter) Add(id string, reftime time.Time) {
-	uc.cache.Add(id, reftime)
+func (uc *UniqueCounter) purge(reftime time.Time) {
 	var oldestBound = reftime.Add(-uc.maxAge)
 
 	for {
@@ -40,10 +40,20 @@ func (uc *UniqueCounter) Add(id string, reftime time.Time) {
 		vt := v.(time.Time)
 		if vt.Before(oldestBound) {
 			uc.cache.Remove(k)
+			fmt.Println(k)
 		} else {
 			break
 		}
 	}
+}
+
+func (uc *UniqueCounter) Add(id string, reftime time.Time) {
+	uc.cache.Add(id, reftime)
+
+}
+
+func (uc *UniqueCounter) Count() int {
+	return uc.cache.Len()
 }
 
 type UniqueCounterMap struct {
@@ -51,8 +61,16 @@ type UniqueCounterMap struct {
 	lock     sync.RWMutex
 }
 
-func (uc *UniqueCounter) Count() int {
-	return uc.cache.Len()
+func (cm *UniqueCounterMap) purge(reftime time.Time) {
+	cm.lock.Lock()
+	var l = make([]*UniqueCounter, 0, len(cm.counters))
+	for _, v := range cm.counters {
+		l = append(l, v)
+	}
+	cm.lock.Unlock()
+	for _, v := range l {
+		v.purge(reftime)
+	}
 }
 
 func (cm *UniqueCounterMap) getOrCreateCounter(name string, timeWindow time.Duration) *UniqueCounter {
@@ -70,10 +88,11 @@ func (cm *UniqueCounterMap) getOrCreateCounter(name string, timeWindow time.Dura
 type UniqueValueMetrics struct {
 	r       *prometheus.Registry
 	metrics []injectLineFunc
+	ucm     *UniqueCounterMap
 }
 
 func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig) *UniqueValueMetrics {
-	var ucm UniqueCounterMap
+	var ucm = &UniqueCounterMap{}
 	ucm.counters = map[string]*UniqueCounter{}
 	var r = prometheus.NewRegistry()
 
@@ -109,7 +128,7 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig) *UniqueValu
 		})
 
 	}
-	return &UniqueValueMetrics{r, metrics}
+	return &UniqueValueMetrics{r, metrics, ucm}
 }
 
 func (m *UniqueValueMetrics) HttpHandler() http.Handler {
@@ -121,4 +140,8 @@ func (m *UniqueValueMetrics) HandleLogLine(line map[string]string) {
 	for _, v := range m.metrics {
 		v(line)
 	}
+}
+
+func (m *UniqueValueMetrics) Purge(timeref time.Time) {
+	m.ucm.purge(timeref)
 }
