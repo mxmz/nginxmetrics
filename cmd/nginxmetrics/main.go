@@ -18,7 +18,12 @@ import (
 )
 
 type config struct {
-	Metrics map[string]*metrics.MetricConfig `json:"metrics,omitempty"`
+	Metrics map[string]*metrics.MetricConfig          `json:"metrics,omitempty"`
+	Unique  map[string]*metrics.DistinctCounterConfig `json:"unique,omitempty"`
+}
+
+type logHandler interface {
+	HandleLogLine(line map[string]string)
 }
 
 func main() {
@@ -41,7 +46,7 @@ func main() {
 
 	case "unique":
 		{
-			panic("not yet implemented")
+			doUniqueMetrics(&config, os.Args[3:])
 		}
 	}
 
@@ -72,27 +77,33 @@ func doStandardMetrics(config *config, files []string) {
 	http.Handle("/", m.HttpHandler())
 	http.ListenAndServe(":9802", nil)
 }
+func doUniqueMetrics(config *config, files []string) {
+	var m = metrics.NewUniqueValueMetrics(config.Unique)
 
-// func readLog(m *metrics.Metrics) {
+	go func() {
+		var found = map[string]struct{}{}
+		for {
+			fmt.Println(len(found))
+			for _, v := range files {
 
-// 	for {
-// 		var file, _ = ioutil.ReadFile("../../metrics/sample.json.log")
+				var files, _ = filepath.Glob(v)
+				for _, v := range files {
+					if _, ok := found[v]; !ok {
+						go followLog(m, v)
+						found[v] = struct{}{}
+					}
+				}
+			}
+			time.Sleep(10 * time.Second)
+		}
 
-// 		var lines = strings.Split(string(file), "\n")
+	}()
+	http.Handle("/metrics", m.HttpHandler())
+	http.Handle("/", m.HttpHandler())
+	http.ListenAndServe(":9803", nil)
+}
 
-// 		for _, line := range lines {
-// 			var lineMap map[string]string
-// 			json.Unmarshal([]byte(line), &lineMap)
-// 			m.HandleLogLine(lineMap)
-// 			if lineMap["vhost"] == "" {
-// 				panic("")
-// 			}
-// 			time.Sleep(10 * time.Millisecond)
-// 		}
-// 	}
-// }
-
-func followLog(m *metrics.Metrics, path string) {
+func followLog(m logHandler, path string) {
 
 	t, err := tail.TailFile(path, tail.Config{Follow: true, ReOpen: true, Location: &tail.SeekInfo{Offset: 0, Whence: os.SEEK_END}, Poll: true})
 	if err != nil {

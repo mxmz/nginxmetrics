@@ -60,8 +60,8 @@ var config1 = `
 	},
 	"unique": {
 		"users": {
-			"time_window": 3600,
-			"id_source": "remote_addr",
+			"time_window": 60,
+			"value_source": "remote_addr",
 			"label_map": {
 				"vhost":          "vhost"
 			}

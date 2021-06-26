@@ -12,10 +12,10 @@ import (
 )
 
 type DistinctCounterConfig struct {
-	IdSource   string            `json:"id_source,omitempty"`
-	TimeWindow int               `json:"time_window,omitempty"`
-	LabelMap   map[string]string `json:"label_map,omitempty"`
-	IfMatch    map[string]string `json:"if_match,omitempty"`
+	ValueSource string            `json:"value_source,omitempty"`
+	TimeWindow  int               `json:"time_window,omitempty"`
+	LabelMap    map[string]string `json:"label_map,omitempty"`
+	IfMatch     map[string]string `json:"if_match,omitempty"`
 }
 
 type UniqueCounter struct {
@@ -81,7 +81,7 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig) *UniqueValu
 	for k, v := range config {
 		var name = k
 		var labelMap = v.LabelMap
-		var idSource = v.IdSource
+		var idSource = v.ValueSource
 		var ifMatch = makeIfMatchMap(v.IfMatch)
 		gauge := promauto.With(r).NewGaugeVec(prometheus.GaugeOpts{
 			Name: name,
