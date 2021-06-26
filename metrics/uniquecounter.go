@@ -100,7 +100,7 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig) *UniqueValu
 				var labelKey = ""
 				for k, v := range labelMap {
 					labelValues[k] = l[v]
-					labelKey += "#" + k
+					labelKey += "#" + k + "#" + l[v]
 				}
 				uc := ucm.getOrCreateCounter(labelKey, time.Duration(v.TimeWindow)*time.Second)
 				uc.Add(id, time.Now())
