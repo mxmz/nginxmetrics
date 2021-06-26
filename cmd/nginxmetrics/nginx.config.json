@@ -36,5 +36,14 @@
 			"label_map": {
 			}
 		}
+	},
+	"unique": {
+		"nginx_users": {
+			"time_window": 3600,
+			"value_source": "remote_addr",
+			"label_map": {
+				"vhost": "vhost"
+			}
+	  	}
 	}
 }
