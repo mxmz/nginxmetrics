@@ -27,15 +27,34 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	json.Unmarshal(configContent, &config)
+	err = json.Unmarshal(configContent, &config)
+	if err != nil {
+		panic(err)
+	}
 
-	var m = metrics.NewMetrics(&metrics.Config{Metrics: config.Metrics})
+	var mode = os.Args[2]
+	switch mode {
+	case "standard":
+		{
+			doStandardMetrics(&config, os.Args[3:])
+		}
+
+	case "unique":
+		{
+			panic("not yet implemented")
+		}
+	}
+
+}
+
+func doStandardMetrics(config *config, files []string) {
+	var m = metrics.NewMetrics(config.Metrics)
 
 	go func() {
 		var found = map[string]struct{}{}
 		for {
 			fmt.Println(len(found))
-			for _, v := range os.Args[2:] {
+			for _, v := range files {
 
 				var files, _ = filepath.Glob(v)
 				for _, v := range files {

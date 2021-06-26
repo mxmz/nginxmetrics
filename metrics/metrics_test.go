@@ -57,8 +57,22 @@ var config1 = `
 				"uri": "^/lib/"
 			}
 		}
+	},
+	"unique": {
+		"users": {
+			"time_window": 3600,
+			"id_source": "remote_addr",
+			"label_map": {
+				"vhost":          "vhost"
+			}
+	  	}
 	}
 }`
+
+type Config struct {
+	Metrics map[string]*MetricConfig          `json:"metrics,omitempty"`
+	Unique  map[string]*DistinctCounterConfig `json:"unique,omitempty"`
+}
 
 func TestMetrics_HandleLogLine(t *testing.T) {
 
@@ -67,7 +81,35 @@ func TestMetrics_HandleLogLine(t *testing.T) {
 
 	var config Config
 	json.Unmarshal([]byte(config1), &config)
-	var m = NewMetrics(&config)
+	var m = NewMetrics(config.Metrics)
+
+	for _, line := range lines {
+		var lineMap map[string]string
+		json.Unmarshal([]byte(line), &lineMap)
+		m.HandleLogLine(lineMap)
+
+	}
+
+	var r = m.r
+
+	fmt.Printf("r: %v\n", r)
+
+	var c, _ = r.Gather()
+	for _, v := range c {
+
+		fmt.Printf("v: %v\n", v)
+	}
+	var _ = r
+}
+
+func TestUniqueValueMetrics_HandleLogLine(t *testing.T) {
+
+	var file, _ = ioutil.ReadFile("./sample.json.log")
+	var lines = strings.Split(string(file), "\n")
+
+	var config Config
+	json.Unmarshal([]byte(config1), &config)
+	var m = NewUniqueValueMetrics(config.Unique)
 
 	for _, line := range lines {
 		var lineMap map[string]string

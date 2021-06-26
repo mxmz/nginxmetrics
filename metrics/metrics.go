@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"net/http"
-	"regexp"
 	"strconv"
 	"time"
 
@@ -18,41 +17,16 @@ type MetricConfig struct {
 	IfMatch     map[string]string `json:"if_match,omitempty"`
 }
 
-type Config struct {
-	Metrics map[string]*MetricConfig `json:"metrics,omitempty"`
-}
-
-type injectLineFunc func(line map[string]string)
-
 type Metrics struct {
 	r       *prometheus.Registry
-	metrics map[string]injectLineFunc
+	metrics []injectLineFunc
 }
 
-func keys(m map[string]string) []string {
-	l := []string{}
-	for k := range m {
-		l = append(l, k)
-	}
-	return l
-}
-
-func makeIfMatchMap(m map[string]string) map[string]*regexp.Regexp {
-	if m == nil {
-		return nil
-	}
-	var rv = map[string]*regexp.Regexp{}
-	for k, v := range m {
-		rv[k] = regexp.MustCompile(v)
-	}
-	return rv
-}
-
-func NewMetrics(c *Config) *Metrics {
-	var metrics = map[string]injectLineFunc{}
+func NewMetrics(config map[string]*MetricConfig) *Metrics {
+	var metrics = []injectLineFunc{}
 	var r = prometheus.NewRegistry()
 
-	for k, v := range c.Metrics {
+	for k, v := range config {
 		var name = k
 		var labelMap = v.LabelMap
 		var valueSource = v.ValueSource
@@ -64,7 +38,7 @@ func NewMetrics(c *Config) *Metrics {
 					Name: name,
 					Help: name,
 				}, keys(v.LabelMap))
-				metrics[k] = func(l map[string]string) {
+				metrics = append(metrics, func(l map[string]string) {
 					for k, v := range ifMatch {
 						if !v.MatchString(l[k]) {
 							return
@@ -78,7 +52,7 @@ func NewMetrics(c *Config) *Metrics {
 						}
 						counter.With(labelValues).Add(float64(c))
 					}
-				}
+				})
 			}
 			break
 		case "summary":
@@ -89,7 +63,7 @@ func NewMetrics(c *Config) *Metrics {
 					MaxAge:     10 * time.Minute,
 					Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 				}, keys(v.LabelMap))
-				metrics[k] = func(l map[string]string) {
+				metrics = append(metrics, func(l map[string]string) {
 					for k, v := range ifMatch {
 						if !v.MatchString(l[k]) {
 							return
@@ -103,7 +77,7 @@ func NewMetrics(c *Config) *Metrics {
 						}
 						counter.With(labelValues).Observe(float64(c))
 					}
-				}
+				})
 			}
 			break
 		default:
