@@ -1,7 +1,7 @@
 package metrics
 
 import (
-	"fmt"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -40,7 +40,7 @@ func (uc *UniqueCounter) purge(reftime time.Time) {
 		vt := v.(time.Time)
 		if vt.Before(oldestBound) {
 			uc.cache.Remove(k)
-			fmt.Println(k)
+			log.Println(k)
 		} else {
 			break
 		}
@@ -64,12 +64,14 @@ type UniqueCounterMap struct {
 func (cm *UniqueCounterMap) purge(reftime time.Time) {
 	cm.lock.Lock()
 	var l = make([]*UniqueCounter, 0, len(cm.counters))
-	for _, v := range cm.counters {
+	for k, v := range cm.counters {
 		l = append(l, v)
+		log.Printf("purging %s[%d]...\n", k, v.Count())
 	}
 	cm.lock.Unlock()
 	for _, v := range l {
 		v.purge(reftime)
+
 	}
 }
 
