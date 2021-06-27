@@ -1,4 +1,5 @@
 metrics/debug.test
 cmd/nginxmetrics/nginxmetrics
 metrics/sample.json.log
-metrics/__debug_bin
+**/__debug_bin
+.temp*
