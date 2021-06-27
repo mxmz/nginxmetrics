@@ -22,11 +22,12 @@ type DistinctCounterConfig struct {
 type UniqueCounter struct {
 	cache  *lru.Cache
 	maxAge time.Duration
+	gauge  prometheus.Gauge
 }
 
-func NewUniqueCounter(size int, maxAge time.Duration) *UniqueCounter {
+func NewUniqueCounter(size int, maxAge time.Duration, gauge prometheus.Gauge) *UniqueCounter {
 	var c, _ = lru.New(size)
-	return &UniqueCounter{c, maxAge}
+	return &UniqueCounter{c, maxAge, gauge}
 }
 
 func (uc *UniqueCounter) purge(reftime time.Time) {
@@ -40,6 +41,7 @@ func (uc *UniqueCounter) purge(reftime time.Time) {
 		vt := v.(time.Time)
 		if vt.Before(oldestBound) {
 			uc.cache.Remove(k)
+			uc.gauge.Set(float64(uc.cache.Len()))
 			log.Println(k)
 		} else {
 			break
@@ -49,7 +51,7 @@ func (uc *UniqueCounter) purge(reftime time.Time) {
 
 func (uc *UniqueCounter) Add(id string, reftime time.Time) {
 	uc.cache.Add(id, reftime)
-
+	uc.gauge.Set(float64(uc.cache.Len()))
 }
 
 func (uc *UniqueCounter) Count() int {
@@ -75,14 +77,23 @@ func (cm *UniqueCounterMap) purge(reftime time.Time) {
 	}
 }
 
-func (cm *UniqueCounterMap) getOrCreateCounter(name string, timeWindow time.Duration) *UniqueCounter {
+func (cm *UniqueCounterMap) get(name string) *UniqueCounter {
 	cm.lock.Lock()
 	defer cm.lock.Unlock()
 	var rv, ok = cm.counters[name]
 	if ok {
 		return rv
 	}
-	rv = NewUniqueCounter(1024, timeWindow)
+	return nil
+}
+func (cm *UniqueCounterMap) create(name string, timeWindow time.Duration, gauge prometheus.Gauge) *UniqueCounter {
+	cm.lock.Lock()
+	defer cm.lock.Unlock()
+	var rv, ok = cm.counters[name]
+	if ok {
+		return rv
+	}
+	rv = NewUniqueCounter(1024, timeWindow, gauge)
 	cm.counters[name] = rv
 	return rv
 }
@@ -104,7 +115,7 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig) *UniqueValu
 		var labelMap = v.LabelMap
 		var idSource = v.ValueSource
 		var ifMatch = makeIfMatchMap(v.IfMatch)
-		gauge := promauto.With(r).NewGaugeVec(prometheus.GaugeOpts{
+		gaugevec := promauto.With(r).NewGaugeVec(prometheus.GaugeOpts{
 			Name: name,
 			Help: name,
 		}, keys(v.LabelMap))
@@ -123,9 +134,13 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig) *UniqueValu
 					labelValues[k] = l[v]
 					labelKey += "#" + k + "#" + l[v]
 				}
-				uc := ucm.getOrCreateCounter(labelKey, time.Duration(v.TimeWindow)*time.Second)
+				uc := ucm.get(labelKey)
+				if uc == nil {
+					gauge := gaugevec.With(labelValues)
+					uc = ucm.create(labelKey, time.Duration(v.TimeWindow)*time.Second, gauge)
+				}
 				uc.Add(id, time.Now())
-				gauge.With(labelValues).Set(float64(uc.Count()))
+
 			}
 		})
 
