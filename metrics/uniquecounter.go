@@ -108,6 +108,7 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig) *UniqueValu
 	var ucm = &UniqueCounterMap{}
 	ucm.counters = map[string]*UniqueCounter{}
 	var r = prometheus.NewRegistry()
+	r.MustRegister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
 
 	var metrics = []injectLineFunc{}
 	for k, v := range config {

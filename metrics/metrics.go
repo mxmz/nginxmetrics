@@ -25,6 +25,7 @@ type Metrics struct {
 func NewMetrics(config map[string]*MetricConfig) *Metrics {
 	var metrics = []injectLineFunc{}
 	var r = prometheus.NewRegistry()
+	r.MustRegister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
 
 	for k, v := range config {
 		var name = k
