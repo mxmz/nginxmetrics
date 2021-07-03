@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"time"
 
+	jsoniter "github.com/json-iterator/go"
 	"mxmz.it/nginxmetrics/metrics"
 )
 
@@ -110,6 +111,7 @@ func followLog(m logHandler, path string) {
 	if err != nil {
 		panic(err)
 	}
+	var json = jsoniter.ConfigCompatibleWithStandardLibrary
 	var lines = t.Lines
 	var count = 0
 	for {
