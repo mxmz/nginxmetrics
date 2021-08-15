@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -55,7 +56,7 @@ func NewMetrics(config map[string]*MetricConfig) *Metrics {
 					}
 				})
 			}
-			break
+
 		case "summary":
 			{
 				counter := promauto.With(r).NewSummaryVec(prometheus.SummaryOpts{
@@ -80,7 +81,7 @@ func NewMetrics(config map[string]*MetricConfig) *Metrics {
 					}
 				})
 			}
-			break
+
 		default:
 			panic("Unsupporter metric type")
 		}
@@ -123,4 +124,12 @@ func (m *Metrics) HandleLogLine(line map[string]string) {
 
 func (m *Metrics) HttpHandler() http.Handler {
 	return promhttp.HandlerFor(m.r, promhttp.HandlerOpts{})
+}
+
+func StringizeMap(in map[string]interface{}) map[string]string {
+	var out = make(map[string]string, len(in))
+	for k, v := range in {
+		out[k] = fmt.Sprint(v)
+	}
+	return out
 }

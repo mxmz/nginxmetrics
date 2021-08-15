@@ -119,16 +119,16 @@ func followLog(m logHandler, path string) {
 		case line := <-lines:
 			{
 				var err error
-				var lineMap map[string]string
+				var lineMap map[string]interface{}
 				if strings.HasPrefix(line.Text, "{") {
 					err = json.Unmarshal([]byte(line.Text), &lineMap)
 				} else {
 					if strings.Contains(line.Text, "[error]") {
-						lineMap = map[string]string{
+						lineMap = map[string]interface{}{
 							"error": "1",
 						}
 					} else if strings.Contains(line.Text, "[crit]") {
-						lineMap = map[string]string{
+						lineMap = map[string]interface{}{
 							"crit": "1",
 						}
 					} else {
@@ -137,7 +137,7 @@ func followLog(m logHandler, path string) {
 				}
 
 				if err == nil {
-					m.HandleLogLine(lineMap)
+					m.HandleLogLine(metrics.StringizeMap(lineMap))
 					count++
 					//println(count, line.Text)
 				}
