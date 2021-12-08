@@ -3,6 +3,7 @@ package metrics
 import (
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -114,7 +115,7 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig) *UniqueValu
 	for k, v := range config {
 		var name = k
 		var labelMap = v.LabelMap
-		var idSource = v.ValueSource
+		var idSource = strings.Split(v.ValueSource, ",")
 		var ifMatch = makeIfMatchMap(v.IfMatch)
 		gaugevec := promauto.With(r).NewGaugeVec(prometheus.GaugeOpts{
 			Name: name,
@@ -126,8 +127,13 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig) *UniqueValu
 					return
 				}
 			}
-			id, ok := l[idSource]
-			if ok && len(id) > 0 {
+			id := ""
+			for _, v := range idSource {
+				id += "#" + l[v]
+			}
+			//id, ok := l[idSource]
+			if len(id) > len(idSource) {
+				//	fmt.Printf("id = %v\n", id)
 
 				var labelValues = map[string]string{}
 				var labelKey = ""

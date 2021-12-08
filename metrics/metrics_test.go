@@ -61,7 +61,7 @@ var config1 = `
 	"unique": {
 		"users": {
 			"time_window": 60,
-			"value_source": "remote_addr",
+			"value_source": "remote_addr,user_agent",
 			"label_map": {
 				"vhost":          "vhost"
 			}
@@ -147,7 +147,7 @@ func TestUniqueValueMetrics_HandleLogLine(t *testing.T) {
 
 	var r = m.r
 
-	fmt.Printf("r: %v\n", r)
+	fmt.Printf("r = %v\n", r)
 
 	var c, _ = r.Gather()
 	for _, v := range c {
