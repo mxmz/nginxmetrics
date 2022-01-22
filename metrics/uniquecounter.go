@@ -194,12 +194,28 @@ func (m *UniqueValueMetrics) Purge(timeref time.Time) {
 	m.ucm.purge(timeref)
 }
 
+type inspectData struct {
+	Count int       `json:"count"`
+	First time.Time `json:"first,omitempty"`
+	Last  time.Time `json:"last,omitempty"`
+}
+
 func (m *UniqueValueMetrics) InspectHttpHandler() http.Handler {
-	return http.HandlerFunc(func(rsp http.ResponseWriter, req *http.Request) {
+	return http.HandlerFunc(func(rsp http.ResponseWriter, _ *http.Request) {
 		var ks = m.ucm.keys()
-		var rv = map[string]interface{}{}
+		var rv = map[string]map[string]inspectData{}
 		for _, v := range ks {
-			rv[v] = &struct{}{}
+			var counter = m.ucm.get(v)
+			var keys = counter.cache.Keys()
+			var data = map[string]inspectData{}
+			for _, k := range keys {
+				var e, ok = counter.cache.Get(k)
+				if ok {
+					var entry = e.(*cacheEntry)
+					data[k.(string)] = inspectData{entry.count, entry.first, entry.last}
+				}
+			}
+			rv[v] = data
 		}
 		var json, _ = json.Marshal(rv)
 		rsp.WriteHeader(200)
