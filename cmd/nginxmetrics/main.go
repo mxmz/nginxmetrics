@@ -102,6 +102,7 @@ func doUniqueMetrics(config *config, files []string) {
 	}()
 	http.Handle("/metrics", m.HttpHandler())
 	http.Handle("/", m.HttpHandler())
+	http.Handle("/inspect", m.InspectHttpHandler())
 	http.ListenAndServe(":9803", nil)
 }
 

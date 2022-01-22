@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
@@ -102,6 +103,15 @@ func (cm *UniqueCounterMap) get(name string) *UniqueCounter {
 	}
 	return nil
 }
+func (cm *UniqueCounterMap) keys() []string {
+	cm.lock.Lock()
+	defer cm.lock.Unlock()
+	var rv = make([]string, 0, len(cm.counters))
+	for k, _ := range cm.counters {
+		rv = append(rv, k)
+	}
+	return rv
+}
 func (cm *UniqueCounterMap) create(name string, timeWindow time.Duration, gauge prometheus.Gauge) *UniqueCounter {
 	cm.lock.Lock()
 	defer cm.lock.Unlock()
@@ -182,4 +192,18 @@ func (m *UniqueValueMetrics) HandleLogLine(line map[string]string) {
 
 func (m *UniqueValueMetrics) Purge(timeref time.Time) {
 	m.ucm.purge(timeref)
+}
+
+func (m *UniqueValueMetrics) InspectHttpHandler() http.Handler {
+	return http.HandlerFunc(func(rsp http.ResponseWriter, req *http.Request) {
+		var ks = m.ucm.keys()
+		var rv = map[string]interface{}{}
+		for _, v := range ks {
+			rv[v] = &struct{}{}
+		}
+		var json, _ = json.Marshal(rv)
+		rsp.WriteHeader(200)
+		rsp.Header().Add("Content-Type", "application/json")
+		rsp.Write(json)
+	})
 }
