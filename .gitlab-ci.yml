@@ -11,9 +11,6 @@ stages:
 #    - go test -race $(go list ./... | grep -v /vendor/)
 
 build-go:
-  tags:
-    - linux
-    - docker
   image: golang:latest
   stage: build1
   script:
