@@ -154,7 +154,7 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig) *UniqueValu
 			}
 			id := ""
 			for _, v := range idSource {
-				id += "#" + l[v]
+				id += "#" + strings.TrimSpace(l[v])
 			}
 			//id, ok := l[idSource]
 			if len(id) > len(idSource) {
@@ -163,7 +163,7 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig) *UniqueValu
 				var labelValues = map[string]string{}
 				var labelKey = name
 				for k, v := range labelMap {
-					labelValues[k] = l[v]
+					labelValues[k] = strings.TrimSpace(l[v])
 					labelKey += "#" + k + "#" + l[v]
 				}
 				uc := ucm.get(labelKey)
