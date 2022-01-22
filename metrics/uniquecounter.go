@@ -161,7 +161,7 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig) *UniqueValu
 				//	fmt.Printf("id = %v\n", id)
 
 				var labelValues = map[string]string{}
-				var labelKey = ""
+				var labelKey = name
 				for k, v := range labelMap {
 					labelValues[k] = l[v]
 					labelKey += "#" + k + "#" + l[v]
