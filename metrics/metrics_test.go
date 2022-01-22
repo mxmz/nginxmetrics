@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"strings"
 	"testing"
+	"time"
 )
 
 var config1 = `
@@ -154,6 +155,7 @@ func TestUniqueValueMetrics_HandleLogLine(t *testing.T) {
 
 		fmt.Printf("v: %v\n", v)
 	}
+	m.Purge(time.Now())
 	var _ = r
 }
 

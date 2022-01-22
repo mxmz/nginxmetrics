@@ -26,6 +26,12 @@ type UniqueCounter struct {
 	gauge  prometheus.Gauge
 }
 
+type cacheEntry struct {
+	count int
+	first time.Time
+	last  time.Time
+}
+
 func NewUniqueCounter(size int, maxAge time.Duration, gauge prometheus.Gauge) *UniqueCounter {
 	var c, _ = lru.New(size)
 	return &UniqueCounter{c, maxAge, gauge}
@@ -39,7 +45,8 @@ func (uc *UniqueCounter) purge(reftime time.Time) {
 		if !ok {
 			break
 		}
-		vt := v.(time.Time)
+		e := v.(*cacheEntry)
+		vt := e.last
 		if vt.Before(oldestBound) {
 			uc.cache.Remove(k)
 			uc.gauge.Set(float64(uc.cache.Len()))
@@ -51,7 +58,15 @@ func (uc *UniqueCounter) purge(reftime time.Time) {
 }
 
 func (uc *UniqueCounter) Add(id string, reftime time.Time) {
-	uc.cache.Add(id, reftime)
+	var e, ok = uc.cache.Get(id)
+	var updated *cacheEntry
+	if !ok {
+		updated = &cacheEntry{1, reftime, reftime}
+	} else {
+		updated = e.(*cacheEntry)
+		updated.count++
+	}
+	uc.cache.Add(id, updated)
 	uc.gauge.Set(float64(uc.cache.Len()))
 }
 
@@ -147,7 +162,6 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig) *UniqueValu
 					uc = ucm.create(labelKey, time.Duration(v.TimeWindow)*time.Second, gauge)
 				}
 				uc.Add(id, time.Now())
-
 			}
 		})
 
