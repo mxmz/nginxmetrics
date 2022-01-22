@@ -66,6 +66,7 @@ func (uc *UniqueCounter) Add(id string, reftime time.Time) {
 	} else {
 		updated = e.(*cacheEntry)
 		updated.count++
+		updated.last = reftime
 	}
 	uc.cache.Add(id, updated)
 	uc.gauge.Set(float64(uc.cache.Len()))
