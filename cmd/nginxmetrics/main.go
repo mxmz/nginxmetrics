@@ -75,9 +75,9 @@ func doStandardMetrics(config *config, files []string) {
 
 	}()
 	http.Handle("/metrics", m.HttpHandler())
+	http.Handle("/config", returnAsJson((config.Metrics)))
 	http.Handle("/", m.HttpHandler())
 	http.ListenAndServe(":9802", nil)
-	http.Handle("/config", returnAsJson((config.Metrics)))
 }
 func doUniqueMetrics(config *config, files []string) {
 	var m = metrics.NewUniqueValueMetrics(config.Unique)
