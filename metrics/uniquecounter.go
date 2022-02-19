@@ -21,10 +21,12 @@ type DistinctCounterConfig struct {
 	IfMatch     map[string]string `json:"if_match,omitempty"`
 }
 
-type UniqueCounter struct {
-	cache  *lru.Cache
-	maxAge time.Duration
-	gauge  prometheus.Gauge
+type gaugeSetter func(v float64)
+
+type uniqueCounter struct {
+	cache    *lru.Cache
+	maxAge   time.Duration
+	setGauge gaugeSetter
 }
 
 type cacheEntry struct {
@@ -33,12 +35,12 @@ type cacheEntry struct {
 	last  time.Time
 }
 
-func NewUniqueCounter(size int, maxAge time.Duration, gauge prometheus.Gauge) *UniqueCounter {
+func newUniqueCounter(size int, maxAge time.Duration, gauge gaugeSetter) *uniqueCounter {
 	var c, _ = lru.New(size)
-	return &UniqueCounter{c, maxAge, gauge}
+	return &uniqueCounter{c, maxAge, gauge}
 }
 
-func (uc *UniqueCounter) purge(reftime time.Time) {
+func (uc *uniqueCounter) purge(reftime time.Time) {
 	var oldestBound = reftime.Add(-uc.maxAge)
 
 	for {
@@ -50,7 +52,7 @@ func (uc *UniqueCounter) purge(reftime time.Time) {
 		vt := e.last
 		if vt.Before(oldestBound) {
 			uc.cache.Remove(k)
-			uc.gauge.Set(float64(uc.cache.Len()))
+			uc.setGauge(float64(uc.cache.Len()))
 			log.Println(k)
 		} else {
 			break
@@ -58,7 +60,7 @@ func (uc *UniqueCounter) purge(reftime time.Time) {
 	}
 }
 
-func (uc *UniqueCounter) Add(id string, reftime time.Time) {
+func (uc *uniqueCounter) add(id string, reftime time.Time) {
 	var e, ok = uc.cache.Get(id)
 	var updated *cacheEntry
 	if !ok {
@@ -69,21 +71,21 @@ func (uc *UniqueCounter) Add(id string, reftime time.Time) {
 		updated.last = reftime
 	}
 	uc.cache.Add(id, updated)
-	uc.gauge.Set(float64(uc.cache.Len()))
+	uc.setGauge(float64(uc.cache.Len()))
 }
 
-func (uc *UniqueCounter) Count() int {
+func (uc *uniqueCounter) Count() int {
 	return uc.cache.Len()
 }
 
 type UniqueCounterMap struct {
-	counters map[string]*UniqueCounter
+	counters map[string]*uniqueCounter
 	lock     sync.RWMutex
 }
 
 func (cm *UniqueCounterMap) purge(reftime time.Time) {
 	cm.lock.Lock()
-	var l = make([]*UniqueCounter, 0, len(cm.counters))
+	var l = make([]*uniqueCounter, 0, len(cm.counters))
 	for k, v := range cm.counters {
 		l = append(l, v)
 		log.Printf("purging %s[%d]...\n", k, v.Count())
@@ -95,7 +97,7 @@ func (cm *UniqueCounterMap) purge(reftime time.Time) {
 	}
 }
 
-func (cm *UniqueCounterMap) get(name string) *UniqueCounter {
+func (cm *UniqueCounterMap) get(name string) *uniqueCounter {
 	cm.lock.Lock()
 	defer cm.lock.Unlock()
 	var rv, ok = cm.counters[name]
@@ -113,14 +115,14 @@ func (cm *UniqueCounterMap) keys() []string {
 	}
 	return rv
 }
-func (cm *UniqueCounterMap) create(name string, timeWindow time.Duration, gauge prometheus.Gauge) *UniqueCounter {
+func (cm *UniqueCounterMap) create(name string, timeWindow time.Duration, gauge gaugeSetter) *uniqueCounter {
 	cm.lock.Lock()
 	defer cm.lock.Unlock()
 	var rv, ok = cm.counters[name]
 	if ok {
 		return rv
 	}
-	rv = NewUniqueCounter(1024, timeWindow, gauge)
+	rv = newUniqueCounter(1024, timeWindow, gauge)
 	cm.counters[name] = rv
 	return rv
 }
@@ -133,7 +135,7 @@ type UniqueValueMetrics struct {
 
 func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig) *UniqueValueMetrics {
 	var ucm = &UniqueCounterMap{}
-	ucm.counters = map[string]*UniqueCounter{}
+	ucm.counters = map[string]*uniqueCounter{}
 	var r = prometheus.NewRegistry()
 	r.MustRegister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
 
@@ -170,9 +172,10 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig) *UniqueValu
 				uc := ucm.get(labelKey)
 				if uc == nil {
 					gauge := gaugevec.With(labelValues)
-					uc = ucm.create(labelKey, time.Duration(v.TimeWindow)*time.Second, gauge)
+					setGauge := func(v float64) { gauge.Set(v) }
+					uc = ucm.create(labelKey, time.Duration(v.TimeWindow)*time.Second, setGauge)
 				}
-				uc.Add(id, time.Now())
+				uc.add(id, time.Now())
 			}
 		})
 
