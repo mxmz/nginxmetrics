@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"log"
 )
 
 var config1 = `
@@ -101,6 +103,7 @@ func TestMetrics_HandleLogLine(t *testing.T) {
 		fmt.Printf("v: %v\n", v)
 	}
 	var _ = r
+	t.Log("finished")
 }
 func TestMetrics_HandleLogLine1(t *testing.T) {
 
@@ -120,14 +123,16 @@ func TestMetrics_HandleLogLine1(t *testing.T) {
 
 	var r = m.r
 
-	fmt.Printf("r: %v\n", r)
+	t.Logf("r: %v\n", r)
 
 	var c, _ = r.Gather()
 	for _, v := range c {
 
-		fmt.Printf("v: %v\n", v)
+		t.Logf("v: %v\n", v)
 	}
 	var _ = r
+
+	t.Log("finished")
 }
 
 func TestUniqueValueMetrics_HandleLogLine(t *testing.T) {
@@ -148,15 +153,22 @@ func TestUniqueValueMetrics_HandleLogLine(t *testing.T) {
 
 	var r = m.r
 
-	fmt.Printf("r = %v\n", r)
+	log.Printf("r = %v\n", r)
 
 	var c, _ = r.Gather()
 	for _, v := range c {
 
-		fmt.Printf("v: %v\n", v)
+		log.Printf("v: %v\n", v)
+		if *v.Name == "users" && *v.GetMetric()[0].Label[0].Value == "https://troubleticket-pistacchio-areaclienti.irideos.it" {
+			t.Logf("value: %f", *v.GetMetric()[0].Gauge.Value)
+		}
+		if *v.Name == "users" && *v.GetMetric()[0].Label[0].Value == "https://troubleticket-areaclienti-areaclienti.irideos.it" {
+			t.Logf("value: %f", *v.GetMetric()[0].Gauge.Value)
+		}
 	}
 	m.Purge(time.Now())
 	var _ = r
+	t.Log("finished")
 }
 
 const sample = `

@@ -8,11 +8,93 @@ import (
 	"sync"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
+	"github.com/hashicorp/golang-lru/simplelru"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
+
+type lruCache struct {
+	cache *simplelru.LRU
+	lock  sync.RWMutex
+}
+
+func newLruCache(size int) *lruCache {
+	var c, _ = simplelru.NewLRU(size, nil)
+	return &lruCache{cache: c}
+}
+
+func (c *lruCache) remove(k interface{}) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.cache.Remove(k)
+}
+
+func (c *lruCache) Len() int {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.cache.Len()
+}
+func (c *lruCache) get(k interface{}) (cacheEntry, bool) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	var e, ok = c.cache.Get(k)
+	return *e.(*cacheEntry), ok
+}
+func (c *lruCache) keys() []interface{} {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.cache.Keys()
+}
+func (c *lruCache) getOldest() (interface{}, cacheEntry, bool) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	var k, v, ok = c.cache.GetOldest()
+	if !ok {
+		return "", cacheEntry{}, false
+	} else {
+		return k, *v.(*cacheEntry), true
+	}
+}
+
+func (c *lruCache) PurgeOldestIf(pred func(cacheEntry) bool) {
+	for {
+		var k, e, ok = c.getOldest()
+		if !ok {
+			break
+		}
+		if pred(e) {
+			c.remove(k)
+			log.Println(k)
+		} else {
+			break
+		}
+	}
+}
+
+func (c *lruCache) ForEach(action func(string, cacheEntry)) {
+	var keys = c.keys()
+	for _, k := range keys {
+		var entry, ok = c.get(k)
+		if ok {
+			action(k.(string), entry)
+		}
+	}
+}
+
+func (c *lruCache) AddOrUpdate(k interface{}, add func() *cacheEntry, update func(cacheEntry) cacheEntry) cacheEntry {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	var e, ok = c.cache.Get(k)
+	if ok {
+		updated := update(*e.(*cacheEntry))
+		e = &updated
+	} else {
+		e = add()
+	}
+	c.cache.Add(k, e)
+	return *(e.(*cacheEntry))
+}
 
 type DistinctCounterConfig struct {
 	ValueSource string            `json:"value_source,omitempty"`
@@ -24,7 +106,7 @@ type DistinctCounterConfig struct {
 type gaugeSetter func(v float64)
 
 type uniqueCounter struct {
-	cache    *lru.Cache
+	cache    *lruCache
 	maxAge   time.Duration
 	setGauge gaugeSetter
 }
@@ -36,41 +118,58 @@ type cacheEntry struct {
 }
 
 func newUniqueCounter(size int, maxAge time.Duration, gauge gaugeSetter) *uniqueCounter {
-	var c, _ = lru.New(size)
+	var c = newLruCache(size)
 	return &uniqueCounter{c, maxAge, gauge}
 }
 
 func (uc *uniqueCounter) purge(reftime time.Time) {
 	var oldestBound = reftime.Add(-uc.maxAge)
 
-	for {
-		var k, v, ok = uc.cache.GetOldest()
-		if !ok {
-			break
-		}
-		e := v.(*cacheEntry)
-		vt := e.last
-		if vt.Before(oldestBound) {
-			uc.cache.Remove(k)
-			uc.setGauge(float64(uc.cache.Len()))
-			log.Println(k)
-		} else {
-			break
-		}
-	}
+	uc.cache.PurgeOldestIf(func(e cacheEntry) bool {
+		return e.last.Before(oldestBound)
+	})
+	uc.setGauge(float64(uc.cache.Len()))
+
+	// for {
+	// 	var k, e, ok = uc.cache.GetOldest()
+	// 	if !ok {
+	// 		break
+	// 	}
+	// 	vt := e.last
+	// 	if vt.Before(oldestBound) {
+	// 		uc.cache.Remove(k)
+	// 		uc.setGauge(float64(uc.cache.Len()))
+	// 		log.Println(k)
+	// 	} else {
+	// 		break
+	// 	}
+	// }
 }
 
 func (uc *uniqueCounter) add(id string, reftime time.Time) {
-	var e, ok = uc.cache.Get(id)
-	var updated *cacheEntry
-	if !ok {
-		updated = &cacheEntry{1, reftime, reftime}
-	} else {
-		updated = e.(*cacheEntry)
-		updated.count++
-		updated.last = reftime
-	}
-	uc.cache.Add(id, updated)
+	// var e, ok = uc.cache.Get(id)
+	// var updated *cacheEntry
+	// if !ok {
+	// 	updated = &cacheEntry{1, reftime, reftime}
+	// } else {
+	// 	updated = e.(*cacheEntry)
+	// 	updated.count++
+	// 	updated.last = reftime
+	// }
+	// uc.cache.Add(id, updated)
+
+	uc.cache.AddOrUpdate(
+		id,
+		func() *cacheEntry {
+			return &cacheEntry{1, reftime, reftime}
+		},
+		func(e cacheEntry) cacheEntry {
+			e.count++
+			e.last = reftime
+			return e
+		},
+	)
+
 	uc.setGauge(float64(uc.cache.Len()))
 }
 
@@ -210,15 +309,19 @@ func (m *UniqueValueMetrics) InspectHttpHandler() http.Handler {
 		var rv = map[string]map[string]inspectData{}
 		for _, v := range ks {
 			var counter = m.ucm.get(v)
-			var keys = counter.cache.Keys()
 			var data = map[string]inspectData{}
-			for _, k := range keys {
-				var e, ok = counter.cache.Get(k)
-				if ok {
-					var entry = e.(*cacheEntry)
-					data[k.(string)] = inspectData{entry.count, entry.first, entry.last}
-				}
-			}
+			counter.cache.ForEach(
+				func(k string, entry cacheEntry) {
+					data[k] = inspectData{entry.count, entry.first, entry.last}
+				})
+			// var keys = counter.cache.Keys()
+			// var data = map[string]inspectData{}
+			// for _, k := range keys {
+			// 	var entry, ok = counter.cache.Get(k)
+			// 	if ok {
+			// 		data[k.(string)] = inspectData{entry.count, entry.first, entry.last}
+			// 	}
+			// }
 			rv[v] = data
 		}
 		var json, _ = json.Marshal(rv)
