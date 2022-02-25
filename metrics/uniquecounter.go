@@ -245,6 +245,7 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig, notify func
 		var labelMap = v.LabelMap
 		var idSource = strings.Split(v.ValueSource, ",")
 		var ifMatch = makeIfMatchMap(v.IfMatch)
+		var notifyRateThreshold = v.NotifyRateThreshold
 		gaugevec := promauto.With(r).NewGaugeVec(prometheus.GaugeOpts{
 			Name: name,
 			Help: name,
@@ -276,13 +277,13 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig, notify func
 					uc = ucm.create(labelKey, time.Duration(v.TimeWindow)*time.Second, setGauge)
 				}
 				var entry = uc.add(id, time.Now())
-				if v.NotifyRateThreshold != nil {
+				if notifyRateThreshold != nil {
 					var dt = entry.last.Sub(entry.first)
 					if dt > 0 {
-						log.Printf("count=%v dt=%v\n", entry.count, float64(dt)/float64(time.Second))
-						log.Printf("j=%s l=%v\n", labelKey, l)
+						// log.Printf("count=%v dt=%v\n", entry.count, float64(dt)/float64(time.Second))
+						// log.Printf("j=%s l=%v\n", labelKey, l)
 						var rate = (float64(entry.count) / float64(dt)) * float64(time.Second)
-						if rate >= *v.NotifyRateThreshold {
+						if rate >= *notifyRateThreshold {
 							notify(id, rate, labelValues)
 						}
 					}

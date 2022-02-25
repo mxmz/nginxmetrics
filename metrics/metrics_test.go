@@ -69,7 +69,15 @@ var config1 = `
 				"vhost":          "vhost"
 			},
 			"notify_rate_threshold": 0
+	  	},
+		"users2": {
+			"time_window": 60,
+			"value_source": "remote_addr,user_agent",
+			"label_map": {
+				"vhost":          "vhost"
+			}
 	  	}
+
 	}
 }`
 
