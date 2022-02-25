@@ -233,7 +233,7 @@ type UniqueValueMetrics struct {
 	ucm     *UniqueCounterMap
 }
 
-func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig, notify func(k string, rate float64, labels map[string]string)) *UniqueValueMetrics {
+func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig, notify func(name string, k string, labels map[string]string, rate float64)) *UniqueValueMetrics {
 	var ucm = &UniqueCounterMap{}
 	ucm.counters = map[string]*uniqueCounter{}
 	var r = prometheus.NewRegistry()
@@ -284,7 +284,7 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig, notify func
 						// log.Printf("j=%s l=%v\n", labelKey, l)
 						var rate = (float64(entry.count) / float64(dt)) * float64(time.Second)
 						if rate >= *notifyRateThreshold {
-							notify(id, rate, labelValues)
+							notify(name, id, labelValues, rate)
 						}
 					}
 				}

@@ -151,8 +151,8 @@ func TestUniqueValueMetrics_HandleLogLine(t *testing.T) {
 
 	var config Config
 	json.Unmarshal([]byte(config1), &config)
-	var m = NewUniqueValueMetrics(config.Unique, func(k string, rate float64, labels map[string]string) {
-		fmt.Printf("%s %v %v\n", k, rate, labels)
+	var m = NewUniqueValueMetrics(config.Unique, func(name string, k string, labels map[string]string, rate float64) {
+		fmt.Printf("%s: %s %v %v\n", name, k, labels, rate)
 	})
 
 	for _, line := range lines {

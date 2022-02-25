@@ -81,8 +81,8 @@ func doStandardMetrics(config *config, files []string) {
 	http.ListenAndServe(":9802", nil)
 }
 func doUniqueMetrics(config *config, files []string) {
-	var m = metrics.NewUniqueValueMetrics(config.Unique, func(k string, rate float64, labels map[string]string) {
-		log.Printf("ALERT: %s: rate = %v, labels = [%v]", k, rate, labels)
+	var m = metrics.NewUniqueValueMetrics(config.Unique, func(name string, k string, labels map[string]string, rate float64) {
+		log.Printf("ALERT: %s: id = %s labels = [%v] rate = %v", name, k, labels, rate)
 	})
 
 	go func() {
