@@ -67,7 +67,8 @@ var config1 = `
 			"value_source": "remote_addr,user_agent",
 			"label_map": {
 				"vhost":          "vhost"
-			}
+			},
+			"notify_rate_threshold": 0
 	  	}
 	}
 }`
@@ -142,7 +143,9 @@ func TestUniqueValueMetrics_HandleLogLine(t *testing.T) {
 
 	var config Config
 	json.Unmarshal([]byte(config1), &config)
-	var m = NewUniqueValueMetrics(config.Unique)
+	var m = NewUniqueValueMetrics(config.Unique, func(k string, rate float64, labels map[string]string) {
+		fmt.Printf("%s %v %v\n", k, rate, labels)
+	})
 
 	for _, line := range lines {
 		var lineMap map[string]string

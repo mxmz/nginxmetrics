@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -97,10 +98,11 @@ func (c *lruCache) AddOrUpdate(k interface{}, add func() *cacheEntry, update fun
 }
 
 type DistinctCounterConfig struct {
-	ValueSource string            `json:"value_source,omitempty"`
-	TimeWindow  int               `json:"time_window,omitempty"`
-	LabelMap    map[string]string `json:"label_map,omitempty"`
-	IfMatch     map[string]string `json:"if_match,omitempty"`
+	ValueSource         string            `json:"value_source,omitempty"`
+	TimeWindow          int               `json:"time_window,omitempty"`
+	LabelMap            map[string]string `json:"label_map,omitempty"`
+	IfMatch             map[string]string `json:"if_match,omitempty"`
+	NotifyRateThreshold *float64          `json:"notify_rate_threshold,omitempty"`
 }
 
 type gaugeSetter func(v float64)
@@ -146,7 +148,7 @@ func (uc *uniqueCounter) purge(reftime time.Time) {
 	// }
 }
 
-func (uc *uniqueCounter) add(id string, reftime time.Time) {
+func (uc *uniqueCounter) add(id string, reftime time.Time) cacheEntry {
 	// var e, ok = uc.cache.Get(id)
 	// var updated *cacheEntry
 	// if !ok {
@@ -158,7 +160,7 @@ func (uc *uniqueCounter) add(id string, reftime time.Time) {
 	// }
 	// uc.cache.Add(id, updated)
 
-	uc.cache.AddOrUpdate(
+	var rv = uc.cache.AddOrUpdate(
 		id,
 		func() *cacheEntry {
 			return &cacheEntry{1, reftime, reftime}
@@ -169,8 +171,8 @@ func (uc *uniqueCounter) add(id string, reftime time.Time) {
 			return e
 		},
 	)
-
 	uc.setGauge(float64(uc.cache.Len()))
+	return rv
 }
 
 func (uc *uniqueCounter) Count() int {
@@ -232,7 +234,7 @@ type UniqueValueMetrics struct {
 	ucm     *UniqueCounterMap
 }
 
-func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig) *UniqueValueMetrics {
+func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig, notify func(k string, rate float64, labels map[string]string)) *UniqueValueMetrics {
 	var ucm = &UniqueCounterMap{}
 	ucm.counters = map[string]*uniqueCounter{}
 	var r = prometheus.NewRegistry()
@@ -274,7 +276,17 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig) *UniqueValu
 					setGauge := func(v float64) { gauge.Set(v) }
 					uc = ucm.create(labelKey, time.Duration(v.TimeWindow)*time.Second, setGauge)
 				}
-				uc.add(id, time.Now())
+				var entry = uc.add(id, time.Now())
+				if v.NotifyRateThreshold != nil {
+					var dt = entry.last.Sub(entry.first)
+					if dt > 0 {
+						fmt.Printf("count=%v dt=%v\n", entry.count, float64(dt)/float64(time.Second))
+						var rate = (float64(entry.count) / float64(dt)) * float64(time.Second)
+						if rate >= *v.NotifyRateThreshold {
+							notify(id, rate, labelValues)
+						}
+					}
+				}
 			}
 		})
 
