@@ -280,7 +280,7 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig, notify func
 					var dt = entry.last.Sub(entry.first)
 					if dt > 0 {
 						log.Printf("count=%v dt=%v\n", entry.count, float64(dt)/float64(time.Second))
-						log.Printf("l=%v\n", l)
+						log.Printf("j=%s l=%v\n", labelKey, l)
 						var rate = (float64(entry.count) / float64(dt)) * float64(time.Second)
 						if rate >= *v.NotifyRateThreshold {
 							notify(id, rate, labelValues)
