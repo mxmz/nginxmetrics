@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -280,7 +279,7 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig, notify func
 				if v.NotifyRateThreshold != nil {
 					var dt = entry.last.Sub(entry.first)
 					if dt > 0 {
-						fmt.Printf("count=%v dt=%v\n", entry.count, float64(dt)/float64(time.Second))
+						log.Printf("count=%v dt=%v\n", entry.count, float64(dt)/float64(time.Second))
 						var rate = (float64(entry.count) / float64(dt)) * float64(time.Second)
 						if rate >= *v.NotifyRateThreshold {
 							notify(id, rate, labelValues)

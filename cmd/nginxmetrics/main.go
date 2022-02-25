@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"strings"
 
@@ -81,7 +82,7 @@ func doStandardMetrics(config *config, files []string) {
 }
 func doUniqueMetrics(config *config, files []string) {
 	var m = metrics.NewUniqueValueMetrics(config.Unique, func(k string, rate float64, labels map[string]string) {
-		fmt.Printf("ALERT: %s: rate = %v, labels = [%v]", k, rate, labels)
+		log.Printf("ALERT: %s: rate = %v, labels = [%v]", k, rate, labels)
 	})
 
 	go func() {
