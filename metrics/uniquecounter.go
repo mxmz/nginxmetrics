@@ -320,9 +320,13 @@ type inspectData struct {
 }
 
 func (uvm *UniqueValueMetrics) InspectHttpHandler() http.Handler {
-	return http.HandlerFunc(func(rsp http.ResponseWriter, _ *http.Request) {
+	return http.HandlerFunc(func(rsp http.ResponseWriter, r *http.Request) {
+		var filter = r.URL.Query().Get("metric")
 		var out = map[string]interface{}{}
 		for k, m := range uvm.metrics {
+			if len(filter) > 0 && k != filter {
+				continue
+			}
 
 			var ks = m.keys()
 			var rv = map[string]map[string]inspectData{}
