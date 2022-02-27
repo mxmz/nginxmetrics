@@ -228,20 +228,21 @@ func (cm *UniqueCounterMap) create(name string, timeWindow time.Duration, gauge 
 }
 
 type UniqueValueMetrics struct {
-	r       *prometheus.Registry
-	metrics []injectLineFunc
-	ucm     *UniqueCounterMap
+	r         *prometheus.Registry
+	ingestors []injectLineFunc
+	metrics   map[string]*UniqueCounterMap
 }
 
 func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig, notify func(name string, k string, labels map[string]string, rate float64)) *UniqueValueMetrics {
-	var ucm = &UniqueCounterMap{}
-	ucm.counters = map[string]*uniqueCounter{}
+	var metrics = map[string]*UniqueCounterMap{}
 	var r = prometheus.NewRegistry()
 	r.MustRegister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
 
-	var metrics = []injectLineFunc{}
+	var ingestors = []injectLineFunc{}
 	for k, v := range config {
 		var name = k
+		var counters = &UniqueCounterMap{counters: map[string]*uniqueCounter{}}
+		metrics[name] = counters
 		var labelMap = v.LabelMap
 		var idSource = strings.Split(v.ValueSource, ",")
 		var ifMatch = makeIfMatchMap(v.IfMatch)
@@ -250,7 +251,7 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig, notify func
 			Name: name,
 			Help: name,
 		}, keys(v.LabelMap))
-		metrics = append(metrics, func(l map[string]string) {
+		ingestor := func(l map[string]string) {
 			for k, v := range ifMatch {
 				if !v.MatchString(l[k]) {
 					return
@@ -265,16 +266,16 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig, notify func
 				//	fmt.Printf("id = %v\n", id)
 
 				var labelValues = map[string]string{}
-				var labelKey = name
+				var labelKey = ""
 				for k, v := range labelMap {
 					labelValues[k] = strings.TrimSpace(l[v])
 					labelKey += "#" + k + "#" + l[v]
 				}
-				uc := ucm.get(labelKey)
+				uc := counters.get(labelKey)
 				if uc == nil {
 					gauge := gaugevec.With(labelValues)
 					setGauge := func(v float64) { gauge.Set(v) }
-					uc = ucm.create(labelKey, time.Duration(v.TimeWindow)*time.Second, setGauge)
+					uc = counters.create(labelKey, time.Duration(v.TimeWindow)*time.Second, setGauge)
 				}
 				var entry = uc.add(id, time.Now())
 				if notifyRateThreshold != nil {
@@ -289,10 +290,10 @@ func NewUniqueValueMetrics(config map[string]*DistinctCounterConfig, notify func
 					}
 				}
 			}
-		})
-
+		}
+		ingestors = append(ingestors, ingestor)
 	}
-	return &UniqueValueMetrics{r, metrics, ucm}
+	return &UniqueValueMetrics{r, ingestors, metrics}
 }
 
 func (m *UniqueValueMetrics) HttpHandler() http.Handler {
@@ -301,13 +302,15 @@ func (m *UniqueValueMetrics) HttpHandler() http.Handler {
 
 func (m *UniqueValueMetrics) HandleLogLine(line map[string]string) {
 
-	for _, v := range m.metrics {
+	for _, v := range m.ingestors {
 		v(line)
 	}
 }
 
 func (m *UniqueValueMetrics) Purge(timeref time.Time) {
-	m.ucm.purge(timeref)
+	for _, v := range m.metrics {
+		v.purge(timeref)
+	}
 }
 
 type inspectData struct {
@@ -316,30 +319,36 @@ type inspectData struct {
 	Last  time.Time `json:"last,omitempty"`
 }
 
-func (m *UniqueValueMetrics) InspectHttpHandler() http.Handler {
+func (uvm *UniqueValueMetrics) InspectHttpHandler() http.Handler {
 	return http.HandlerFunc(func(rsp http.ResponseWriter, _ *http.Request) {
-		var ks = m.ucm.keys()
-		var rv = map[string]map[string]inspectData{}
-		for _, v := range ks {
-			var counter = m.ucm.get(v)
-			var data = map[string]inspectData{}
-			counter.cache.ForEach(
-				func(k string, entry cacheEntry) {
-					data[k] = inspectData{entry.count, entry.first, entry.last}
-				})
-			// var keys = counter.cache.Keys()
-			// var data = map[string]inspectData{}
-			// for _, k := range keys {
-			// 	var entry, ok = counter.cache.Get(k)
-			// 	if ok {
-			// 		data[k.(string)] = inspectData{entry.count, entry.first, entry.last}
-			// 	}
-			// }
-			rv[v] = data
+		var out = map[string]interface{}{}
+		for k, m := range uvm.metrics {
+
+			var ks = m.keys()
+			var rv = map[string]map[string]inspectData{}
+			out[k] = rv
+			for _, v := range ks {
+				var counter = m.get(v)
+				var data = map[string]inspectData{}
+				counter.cache.ForEach(
+					func(k string, entry cacheEntry) {
+						data[k] = inspectData{entry.count, entry.first, entry.last}
+					})
+				// var keys = counter.cache.Keys()
+				// var data = map[string]inspectData{}
+				// for _, k := range keys {
+				// 	var entry, ok = counter.cache.Get(k)
+				// 	if ok {
+				// 		data[k.(string)] = inspectData{entry.count, entry.first, entry.last}
+				// 	}
+				// }
+				rv[v] = data
+			}
 		}
-		var json, _ = json.Marshal(rv)
+		var json, _ = json.Marshal(out)
 		rsp.WriteHeader(200)
 		rsp.Header().Add("Content-Type", "application/json")
 		rsp.Write(json)
+
 	})
 }
