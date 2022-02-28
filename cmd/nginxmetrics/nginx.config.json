@@ -43,7 +43,8 @@
 			"value_source": "remote_addr",
 			"label_map": {
 				"vhost": "vhost"
-			}
+			},
+			"notify_rate_threshold": 0
 	  	}
 	}
 }

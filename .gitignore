@@ -3,3 +3,4 @@ cmd/nginxmetrics/nginxmetrics
 metrics/sample.json.log
 **/__debug_bin
 .temp*
+*.temp*

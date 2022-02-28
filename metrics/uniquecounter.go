@@ -350,8 +350,8 @@ func (uvm *UniqueValueMetrics) InspectHttpHandler() http.Handler {
 			}
 		}
 		var json, _ = json.Marshal(out)
-		rsp.WriteHeader(200)
 		rsp.Header().Add("Content-Type", "application/json")
+		rsp.WriteHeader(200)
 		rsp.Write(json)
 
 	})

@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync/atomic"
 
 	"github.com/hpcloud/tail"
 
@@ -81,8 +82,17 @@ func doStandardMetrics(config *config, files []string) {
 	http.ListenAndServe(":9802", nil)
 }
 func doUniqueMetrics(config *config, files []string) {
+	var warnings int64 = 0
+	var warnCh = make(chan int64)
+
 	var m = metrics.NewUniqueValueMetrics(config.Unique, func(name string, k string, labels map[string]string, rate float64) {
-		log.Printf("ALERT: %s: id = %s labels = [%v] rate = %v", name, k, labels, rate)
+		v := atomic.AddInt64(&warnings, 1)
+		select {
+		case warnCh <- v:
+		default:
+			log.Printf("WARN: %s: id = %s labels = [%v] rate = %v", name, k, labels, rate)
+		}
+
 	})
 
 	go func() {
@@ -106,16 +116,33 @@ func doUniqueMetrics(config *config, files []string) {
 	}()
 	http.Handle("/metrics", m.HttpHandler())
 	http.Handle("/", m.HttpHandler())
-	http.Handle("/inspect", m.InspectHttpHandler())
+
+	var inspect = m.InspectHttpHandler()
+	http.Handle("/inspect", inspect)
 	http.Handle("/config", returnAsJson((config.Unique)))
+	http.HandleFunc("/inspect/wait", func(rsp http.ResponseWriter, r *http.Request) {
+
+		select {
+		case <-warnCh:
+		case <-r.Context().Done():
+			{
+				log.Println("abort /inspect/wait")
+			}
+		case <-time.After(30 * time.Second):
+		}
+		rsp.Header().Add("X-Warnings", fmt.Sprintf("%d", warnings))
+		inspect.ServeHTTP(rsp, r)
+
+	})
+
 	http.ListenAndServe(":9803", nil)
 }
 
 func returnAsJson(rv interface{}) http.Handler {
 	return http.HandlerFunc(func(rsp http.ResponseWriter, _ *http.Request) {
 		var json, _ = json.Marshal(rv)
-		rsp.WriteHeader(200)
 		rsp.Header().Add("Content-Type", "application/json")
+		rsp.WriteHeader(200)
 		rsp.Write(json)
 	})
 }
