@@ -2,39 +2,37 @@
 	"metrics": {
 		"nginx_body_bytes_sent": {
 			"value_source": "body_bytes_sent",
-			"type":        "counter",
+			"type": "counter",
 			"label_map": {
-				"vhost":  "vhost",
+				"vhost": "vhost",
 				"method": "method"
 			}
 		},
 		"nginx_request_time": {
 			"value_source": "request_time",
-			"type":        "summary",
+			"type": "summary",
 			"label_map": {
-				"vhost":  "vhost",
+				"vhost": "vhost",
 				"status": "status"
 			}
 		},
 		"nginx_backend_response_time": {
 			"value_source": "backend_response_time",
-			"type":        "summary",
+			"type": "summary",
 			"label_map": {
-				"vhost":          "vhost",
+				"vhost": "vhost",
 				"backend_status": "backend_status"
 			}
 		},
 		"nginx_error_count": {
 			"value_source": "error",
-			"type":        "counter",
-			"label_map": {
-			}
+			"type": "counter",
+			"label_map": {}
 		},
 		"nginx_crit_count": {
 			"value_source": "crit",
-			"type":        "counter",
-			"label_map": {
-			}
+			"type": "counter",
+			"label_map": {}
 		}
 	},
 	"unique": {
@@ -45,6 +43,11 @@
 				"vhost": "vhost"
 			},
 			"notify_rate_threshold": 0
-	  	}
+		}
+	},
+	"nel": {
+		"nel_report_log": "/tmp/nel-report-access.json.log",
+		"csp_report_log": "/tmp/csp-report-access.json.log",
+		"uuid": "455b20f6-072b-451b-b6b1-858ebe50cf1f"
 	}
 }

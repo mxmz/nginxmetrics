@@ -20,9 +20,16 @@ import (
 	"mxmz.it/nginxmetrics/metrics"
 )
 
+type NELConfig struct {
+	NELReportLog string `json:"nel_report_log,omitempty"`
+	CSPReportLog string `json:"csp_report_log,omitempty"`
+	Uuid         string `json:"uuid,omitempty"`
+}
+
 type config struct {
 	Metrics map[string]*metrics.MetricConfig          `json:"metrics,omitempty"`
 	Unique  map[string]*metrics.DistinctCounterConfig `json:"unique,omitempty"`
+	NEL     NELConfig                                 `json:"nel,omitempty"`
 }
 
 type logHandler interface {
@@ -50,6 +57,10 @@ func main() {
 	case "unique":
 		{
 			doUniqueMetrics(&config, os.Args[3:])
+		}
+	case "nel":
+		{
+			doNELReport(&config)
 		}
 	}
 
@@ -187,4 +198,86 @@ func followLog(m logHandler, path string) {
 			}
 		}
 	}
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+const max_nel_report_length = 100000
+
+func sendReportToChan(typ string, ch chan<- interface{}) http.Handler {
+	return http.HandlerFunc(func(rsp http.ResponseWriter, r *http.Request) {
+		if r.ContentLength > max_nel_report_length || r.ContentLength < 0 {
+			r.Body.Close()
+			panic("Invalid content length")
+		}
+		var body, err = ioutil.ReadAll(r.Body)
+		if err != nil {
+			r.Body.Close()
+			panic(err)
+		}
+		var v interface{}
+		err = json.Unmarshal(body, &v)
+		if err != nil {
+			r.Body.Close()
+			panic(err)
+		}
+		var data = map[string]interface{}{}
+		data["type"] = typ
+		data["@timestamp"] = time.Now().Format(time.RFC3339)
+		data["report"] = &v
+		var ctx = r.URL.Query().Get("context")
+		if len(ctx) > 64 {
+			panic("Bad ctx")
+		}
+		data["context"] = ctx
+
+		ch <- data
+		rsp.Header().Add("Content-Type", "application/json")
+		rsp.WriteHeader(200)
+		rsp.Write([]byte("ok\n"))
+	})
+}
+func doNELReport(config *config) {
+	var nelLog = config.NEL.NELReportLog
+	var cspLog = config.NEL.CSPReportLog
+	var nelLogCh = make(chan interface{})
+	var cspLogCh = make(chan interface{})
+
+	var logger = func(ch <-chan interface{}, path string) {
+		var outlog *os.File
+		for {
+			select {
+			case line := <-ch:
+				{
+					if outlog == nil || !fileExists(path) {
+
+						outlog, _ = os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0770)
+					}
+					if outlog != nil {
+						var json, _ = json.Marshal(line)
+						json = append(json, '\n')
+						outlog.Write(json)
+					}
+				}
+			}
+		}
+
+	}
+	go logger(nelLogCh, nelLog)
+	go logger(cspLogCh, cspLog)
+
+	http.Handle("/nel/"+config.NEL.Uuid, sendReportToChan("nel", nelLogCh))
+	http.Handle("/csp/"+config.NEL.Uuid, sendReportToChan("csp", cspLogCh))
+
+	var nop = func(rsp http.ResponseWriter, _ *http.Request) {
+		rsp.Header().Add("Content-Type", "text/plain")
+		rsp.WriteHeader(200)
+		rsp.Write([]byte("nop\n"))
+	}
+	http.HandleFunc("/nop", nop)
+	http.Handle("/config", returnAsJson(config.NEL))
+	http.ListenAndServe(":10666", nil)
 }
