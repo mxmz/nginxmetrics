@@ -232,6 +232,9 @@ func sendReportToChan(typ string, ch chan<- interface{}) http.Handler {
 		if len(ctx) > 64 {
 			panic("Bad ctx")
 		}
+		var x_forwarded_for = r.Header.Get("X-Forwarded-For")
+		data["x_forwarded_for"] = x_forwarded_for
+
 		data["context"] = ctx
 
 		ch <- data
