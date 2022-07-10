@@ -253,6 +253,9 @@ func doNELReport(config *config) {
 			case line := <-ch:
 				{
 					if outlog == nil || !fileExists(path) {
+						if outlog != nil {
+							outlog.Close()
+						}
 
 						outlog, _ = os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0770)
 					}
