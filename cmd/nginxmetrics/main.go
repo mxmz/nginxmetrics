@@ -200,9 +200,9 @@ func followLog(m logHandler, path string) {
 	}
 }
 
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
+func fileIsEmpty(path string) bool {
+	s, err := os.Stat(path)
+	return err != nil || s.Size() == 0
 }
 
 const max_nel_report_length = 100000
@@ -255,7 +255,7 @@ func doNELReport(config *config) {
 			select {
 			case line := <-ch:
 				{
-					if outlog == nil || !fileExists(path) {
+					if outlog == nil || fileIsEmpty(path) {
 						if outlog != nil {
 							outlog.Close()
 						}
